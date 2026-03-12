@@ -1,0 +1,28 @@
+# Environment variables — never commit secrets
+.env
+.env.local
+.env.*.local
+
+# Python
+__pycache__/
+*.py[cod]
+*.pyo
+.venv/
+venv/
+env/
+*.egg-info/
+dist/
+build/
+
+# Node / frontend
+node_modules/
+healthsphere-ui/node_modules/
+healthsphere-ui/dist/
+healthsphere-ui/.env
+healthsphere-ui/.env.local
+
+# macOS
+.DS_Store
+
+# VS Code
+.vscode/
