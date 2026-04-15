@@ -46,6 +46,8 @@ except:
 
 # Store chat sessions
 chat_sessions = {}
+trainer_process: Optional[subprocess.Popen] = None
+trainer_log_file: Optional[str] = None
 
 # Pydantic models
 class ChatRequest(BaseModel):
@@ -67,6 +69,12 @@ class GeocodeRequest(BaseModel):
 class HealthResponse(BaseModel):
     status: str
     service: str
+
+
+class TrainerStatusResponse(BaseModel):
+    running: bool
+    pid: Optional[int] = None
+    message: str
 
 
 CALENDAR_AGENT_URL = os.environ.get("CALENDAR_AGENT_URL", "http://localhost:8000/calendar")
@@ -266,6 +274,119 @@ def stream_chat_response(message: str, session_id: str) -> Iterator[str]:
 @app.get('/api/health', response_model=HealthResponse)
 async def health_check():
     return {"status": "healthy", "service": "HealthSphere AI API"}
+
+
+@app.get('/api/fitness/ai-trainer/status', response_model=TrainerStatusResponse)
+async def trainer_status():
+    global trainer_process
+
+    if trainer_process and trainer_process.poll() is None:
+        return {
+            "running": True,
+            "pid": trainer_process.pid,
+            "message": "AI Gym Trainer is running"
+        }
+
+    trainer_process = None
+    return {
+        "running": False,
+        "pid": None,
+        "message": "AI Gym Trainer is not running"
+    }
+
+
+@app.post('/api/fitness/ai-trainer/start', response_model=TrainerStatusResponse)
+async def start_trainer():
+    global trainer_process, trainer_log_file
+
+    try:
+        if trainer_process and trainer_process.poll() is None:
+            return {
+                "running": True,
+                "pid": trainer_process.pid,
+                "message": "AI Gym Trainer is already running"
+            }
+
+        base_dir = os.path.dirname(os.path.abspath(__file__))
+        trainer_dir = os.path.join(base_dir, 'AI_Gym_Trainer')
+        trainer_script = os.path.join(trainer_dir, 'test.py')
+        trainer_log_file = os.path.join(trainer_dir, 'trainer_runtime.log')
+
+        if not os.path.exists(trainer_script):
+            raise HTTPException(status_code=404, detail="AI Gym Trainer script not found")
+
+        log_handle = open(trainer_log_file, 'a', encoding='utf-8')
+        trainer_process = subprocess.Popen(
+            [sys.executable, trainer_script],
+            cwd=trainer_dir,
+            stdout=log_handle,
+            stderr=log_handle
+        )
+
+        # Catch immediate startup failures and surface logs to frontend.
+        time.sleep(1)
+        if trainer_process.poll() is not None:
+            details = ""
+            try:
+                with open(trainer_log_file, 'r', encoding='utf-8') as f:
+                    details = ''.join(f.readlines()[-10:]).strip()
+            except Exception:
+                details = "No runtime logs available."
+
+            trainer_process = None
+            raise HTTPException(
+                status_code=500,
+                detail=(
+                    "AI Gym Trainer failed to start. "
+                    f"Check camera permissions or media dependencies. Recent logs: {details}"
+                )
+            )
+
+        return {
+            "running": True,
+            "pid": trainer_process.pid,
+            "message": f"AI Gym Trainer started successfully (logs: {trainer_log_file})"
+        }
+    except HTTPException:
+        raise
+    except Exception as e:
+        trainer_process = None
+        raise HTTPException(status_code=500, detail=f"Could not start AI Gym Trainer: {e}")
+
+
+@app.post('/api/fitness/ai-trainer/stop', response_model=TrainerStatusResponse)
+async def stop_trainer():
+    global trainer_process
+
+    try:
+        if not trainer_process or trainer_process.poll() is not None:
+            trainer_process = None
+            return {
+                "running": False,
+                "pid": None,
+                "message": "AI Gym Trainer is already stopped"
+            }
+
+        trainer_process.terminate()
+        trainer_process.wait(timeout=5)
+        trainer_process = None
+
+        return {
+            "running": False,
+            "pid": None,
+            "message": "AI Gym Trainer stopped successfully"
+        }
+    except subprocess.TimeoutExpired:
+        if trainer_process:
+            trainer_process.kill()
+            trainer_process = None
+        return {
+            "running": False,
+            "pid": None,
+            "message": "AI Gym Trainer force-stopped"
+        }
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=f"Could not stop AI Gym Trainer: {e}")
 
 
 @app.post('/api/ask-ai', response_model=ChatResponse)

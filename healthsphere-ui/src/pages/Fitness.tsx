@@ -1,7 +1,9 @@
 import { Dumbbell, Target, Activity, Heart, Trophy, Calendar } from "lucide-react";
+import { useEffect, useState } from "react";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Progress } from "@/components/ui/progress";
+import { getTrainerStatus, startTrainer, stopTrainer } from "@/services/api";
 
 const workoutCategories = [
   {
@@ -47,6 +49,61 @@ const weeklyProgress = [
 export default function Fitness() {
   const completedDays = weeklyProgress.filter((d) => d.completed).length;
   const progressPercent = (completedDays / weeklyProgress.length) * 100;
+  const [trainerRunning, setTrainerRunning] = useState(false);
+  const [trainerPid, setTrainerPid] = useState<number | null>(null);
+  const [trainerMessage, setTrainerMessage] = useState("Checking trainer status...");
+  const [trainerLoading, setTrainerLoading] = useState(false);
+
+  const refreshTrainerStatus = async () => {
+    try {
+      const status = await getTrainerStatus();
+      setTrainerRunning(status.running);
+      setTrainerPid(status.pid ?? null);
+      setTrainerMessage(status.message);
+    } catch (error) {
+      setTrainerMessage(error instanceof Error ? error.message : "Could not fetch trainer status");
+    }
+  };
+
+  useEffect(() => {
+    refreshTrainerStatus();
+  }, []);
+
+  const handleStartTrainer = async () => {
+    setTrainerLoading(true);
+    try {
+      const status = await startTrainer();
+      setTrainerRunning(status.running);
+      setTrainerPid(status.pid ?? null);
+      setTrainerMessage(`${status.message}. A trainer window should open on your system.`);
+    } catch (error) {
+      setTrainerMessage(error instanceof Error ? error.message : "Could not start AI Gym Trainer");
+    } finally {
+      setTrainerLoading(false);
+    }
+  };
+
+  const handleStopTrainer = async () => {
+    setTrainerLoading(true);
+    try {
+      const status = await stopTrainer();
+      setTrainerRunning(status.running);
+      setTrainerPid(status.pid ?? null);
+      setTrainerMessage(status.message);
+    } catch (error) {
+      setTrainerMessage(error instanceof Error ? error.message : "Could not stop AI Gym Trainer");
+    } finally {
+      setTrainerLoading(false);
+    }
+  };
+
+  const handleWorkoutClick = async () => {
+    if (trainerRunning) {
+      await handleStopTrainer();
+    } else {
+      await handleStartTrainer();
+    }
+  };
 
   return (
     <div className="container px-4 py-8">
@@ -179,8 +236,25 @@ export default function Fitness() {
               <p className="mb-4 text-sm text-muted-foreground">
                 Start a quick workout session now
               </p>
-              <Button variant="hero" className="w-full">
-                Start Workout
+              <Button
+                variant="hero"
+                className="w-full"
+                onClick={handleWorkoutClick}
+                disabled={trainerLoading}
+              >
+                {trainerLoading ? "Please wait..." : trainerRunning ? "Stop Workout" : "Start Workout"}
+              </Button>
+              <p className="mt-3 text-xs text-muted-foreground">
+                {trainerMessage}
+                {trainerPid ? ` (PID: ${trainerPid})` : ""}
+              </p>
+              <Button
+                variant="ghost"
+                className="mt-2 w-full"
+                onClick={refreshTrainerStatus}
+                disabled={trainerLoading}
+              >
+                Refresh Status
               </Button>
             </CardContent>
           </Card>

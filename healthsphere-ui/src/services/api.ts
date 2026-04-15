@@ -65,6 +65,12 @@ interface GeocodeResponse {
   address: string;
 }
 
+interface TrainerStatusResponse {
+  running: boolean;
+  pid?: number | null;
+  message: string;
+}
+
 /**
  * Generic error response
  */
@@ -72,6 +78,7 @@ interface ErrorResponse {
   error: string;
   message?: string;
   details?: string;
+  detail?: string | { [key: string]: unknown };
 }
 
 /**
@@ -82,7 +89,13 @@ async function handleResponse<T>(response: Response): Promise<T> {
     const error: ErrorResponse = await response.json().catch(() => ({
       error: 'An unexpected error occurred',
     }));
-    throw new Error(error.message || error.error || `HTTP ${response.status}`);
+    const detail =
+      typeof error.detail === 'string'
+        ? error.detail
+        : error.detail
+          ? JSON.stringify(error.detail)
+          : undefined;
+    throw new Error(error.message || detail || error.error || `HTTP ${response.status}`);
   }
   return response.json();
 }
@@ -233,6 +246,34 @@ export async function geocodeLocation(
 
   const data = await handleResponse<GeocodeResponse>(response);
   return data.address;
+}
+
+/**
+ * Get AI Gym Trainer process status.
+ */
+export async function getTrainerStatus(): Promise<TrainerStatusResponse> {
+  const response = await fetch(`${API_BASE_URL}/fitness/ai-trainer/status`);
+  return handleResponse<TrainerStatusResponse>(response);
+}
+
+/**
+ * Start AI Gym Trainer process.
+ */
+export async function startTrainer(): Promise<TrainerStatusResponse> {
+  const response = await fetch(`${API_BASE_URL}/fitness/ai-trainer/start`, {
+    method: "POST",
+  });
+  return handleResponse<TrainerStatusResponse>(response);
+}
+
+/**
+ * Stop AI Gym Trainer process.
+ */
+export async function stopTrainer(): Promise<TrainerStatusResponse> {
+  const response = await fetch(`${API_BASE_URL}/fitness/ai-trainer/stop`, {
+    method: "POST",
+  });
+  return handleResponse<TrainerStatusResponse>(response);
 }
 
 /**
