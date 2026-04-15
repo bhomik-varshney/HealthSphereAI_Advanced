@@ -8,7 +8,7 @@ import { FileUpload } from "@/components/common/FileUpload";
 import { StatusBanner } from "@/components/common/StatusBanner";
 import { ScrollArea } from "@/components/ui/scroll-area";
 import { cn } from "@/lib/utils";
-import { sendChatMessage as sendChatMessageAPI, analyzeReport as analyzeReportAPI, generateSessionId } from "@/services/api";
+import { sendChatMessageStream as sendChatMessageStreamAPI, analyzeReport as analyzeReportAPI, generateSessionId } from "@/services/api";
 import ReactMarkdown from "react-markdown";
 import remarkGfm from "remark-gfm";
 
@@ -44,22 +44,43 @@ export default function AskAI() {
     };
     
     setMessages((prev) => [...prev, userMessage]);
+
+    const assistantMessageId = (Date.now() + 1).toString();
+    const streamingAssistantMessage: Message = {
+      id: assistantMessageId,
+      role: "assistant",
+      content: "",
+      timestamp: new Date(),
+    };
+
+    setMessages((prev) => [...prev, streamingAssistantMessage]);
     setIsLoading(true);
 
     try {
-      const response = await sendChatMessageAPI(content, sessionId);
-      
-      const assistantMessage: Message = {
-        id: (Date.now() + 1).toString(),
-        role: "assistant",
-        content: response,
-        timestamp: new Date(),
-      };
-      
-      setMessages((prev) => [...prev, assistantMessage]);
+      let fullResponse = "";
+      await sendChatMessageStreamAPI(content, sessionId, (chunk) => {
+        fullResponse += chunk;
+        setMessages((prev) =>
+          prev.map((msg) =>
+            msg.id === assistantMessageId ? { ...msg, content: fullResponse } : msg
+          )
+        );
+      });
+
+      // Ensure we don't leave an empty assistant bubble if no content was streamed.
+      if (!fullResponse.trim()) {
+        setMessages((prev) =>
+          prev.map((msg) =>
+            msg.id === assistantMessageId
+              ? { ...msg, content: "I could not generate a response. Please try again." }
+              : msg
+          )
+        );
+      }
     } catch (err) {
       const errorMessage = err instanceof Error ? err.message : "Failed to get response. Please try again.";
       setError(errorMessage);
+      setMessages((prev) => prev.filter((msg) => msg.id !== assistantMessageId));
       console.error("Chat error:", err);
     } finally {
       setIsLoading(false);

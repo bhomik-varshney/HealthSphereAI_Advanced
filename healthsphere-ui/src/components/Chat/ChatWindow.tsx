@@ -12,9 +12,10 @@ interface Message {
 
 interface MessageBubbleProps {
   message: Message;
+  showStreamingCursor?: boolean;
 }
 
-export function MessageBubble({ message }: MessageBubbleProps) {
+export function MessageBubble({ message, showStreamingCursor = false }: MessageBubbleProps) {
   const isUser = message.role === "user";
 
   return (
@@ -51,9 +52,14 @@ export function MessageBubble({ message }: MessageBubbleProps) {
           {isUser ? (
             <p className="whitespace-pre-wrap m-0">{message.content}</p>
           ) : (
-            <ReactMarkdown remarkPlugins={[remarkGfm]}>
-              {message.content}
-            </ReactMarkdown>
+            <>
+              <ReactMarkdown remarkPlugins={[remarkGfm]}>
+                {message.content}
+              </ReactMarkdown>
+              {showStreamingCursor && (
+                <span className="ml-1 inline-block animate-pulse text-muted-foreground">●</span>
+              )}
+            </>
           )}
         </div>
         <p
@@ -78,6 +84,10 @@ interface ChatWindowProps {
 }
 
 export function ChatWindow({ messages, isLoading }: ChatWindowProps) {
+  const shouldShowTyping =
+    Boolean(isLoading) &&
+    (messages.length === 0 || messages[messages.length - 1].role === "user");
+
   return (
     <div className="flex flex-col gap-4 p-4">
       {messages.length === 0 && !isLoading && (
@@ -95,11 +105,15 @@ export function ChatWindow({ messages, isLoading }: ChatWindowProps) {
         </div>
       )}
 
-      {messages.map((message) => (
-        <MessageBubble key={message.id} message={message} />
+      {messages.map((message, index) => (
+        <MessageBubble
+          key={message.id}
+          message={message}
+          showStreamingCursor={Boolean(isLoading) && index === messages.length - 1 && message.role === "assistant"}
+        />
       ))}
 
-      {isLoading && (
+      {shouldShowTyping && (
         <div className="flex gap-3">
           <div className="flex h-8 w-8 items-center justify-center rounded-full bg-secondary">
             <Bot className="h-4 w-4 text-secondary-foreground" />

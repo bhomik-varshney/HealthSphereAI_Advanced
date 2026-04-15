@@ -121,6 +121,58 @@ export async function sendChatMessage(
 }
 
 /**
+ * Stream a chat response token-by-token from HealthSphere AI.
+ * @param message - User's message
+ * @param sessionId - Unique session ID
+ * @param onChunk - Called for each streamed text chunk
+ * @returns Full assembled AI response
+ */
+export async function sendChatMessageStream(
+  message: string,
+  sessionId: string,
+  onChunk: (chunk: string) => void
+): Promise<string> {
+  const response = await fetch(`${API_BASE_URL}/ask-ai/stream`, {
+    method: 'POST',
+    headers: {
+      'Content-Type': 'application/json',
+    },
+    body: JSON.stringify({
+      message,
+      session_id: sessionId,
+    } as AskAIRequest),
+  });
+
+  if (!response.ok) {
+    const error: ErrorResponse = await response.json().catch(() => ({
+      error: 'An unexpected error occurred',
+    }));
+    throw new Error(error.message || error.error || `HTTP ${response.status}`);
+  }
+
+  if (!response.body) {
+    throw new Error('Streaming is not supported by this browser/environment.');
+  }
+
+  const reader = response.body.getReader();
+  const decoder = new TextDecoder();
+  let fullText = '';
+
+  while (true) {
+    const { done, value } = await reader.read();
+    if (done) break;
+
+    const chunk = decoder.decode(value, { stream: true });
+    if (chunk) {
+      fullText += chunk;
+      onChunk(chunk);
+    }
+  }
+
+  return fullText;
+}
+
+/**
  * Analyze a medical report (PDF or image)
  * @param file - Medical report file (PDF, PNG, or JPG)
  * @returns Analysis results including detailed analysis and summary

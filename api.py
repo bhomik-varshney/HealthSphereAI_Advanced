@@ -4,6 +4,7 @@ Exposes AI services as REST API endpoints for React frontend
 """
 from fastapi import FastAPI, File, UploadFile, HTTPException
 from fastapi.middleware.cors import CORSMiddleware
+from fastapi.responses import StreamingResponse
 from pydantic import BaseModel
 from langchain_core.messages import AIMessage, HumanMessage
 from langchain_groq import ChatGroq
@@ -16,9 +17,10 @@ import pytesseract
 import spacy
 from PIL import Image
 from io import BytesIO
-from typing import Optional, List, Tuple
+from typing import Optional, List, Tuple, Iterator
 import requests
 import re
+import time
 
 app = FastAPI(title="HealthSphere AI API", version="1.0.0")
 
@@ -68,6 +70,8 @@ class HealthResponse(BaseModel):
 
 
 CALENDAR_AGENT_URL = os.environ.get("CALENDAR_AGENT_URL", "http://localhost:8000/calendar")
+STREAM_CHUNK_SIZE = int(os.environ.get("ASK_AI_STREAM_CHUNK_SIZE", "24"))
+STREAM_DELAY_MS = int(os.environ.get("ASK_AI_STREAM_DELAY_MS", "45"))
 
 
 def is_health_reminder_request(message: str) -> bool:
@@ -147,6 +151,118 @@ def get_chat_history(session_id: str):
     return chat_sessions[session_id]
 
 
+def build_medical_prompt(message: str, formatted_history: str) -> str:
+    return f"""
+You are **HealthSphere AI**, an expert medical AI specializing in **healthcare, medicine, and human biology**.
+Your goal is to provide **accurate, science-backed answers** to **all medical-related questions**, including:
+- Medical conditions, symptoms, and treatments
+- Human anatomy and physiology
+- Neuroscience and mental health
+- Pharmacology and common medications
+- Medical research and advancements
+- First aid and emergency care
+- Nutrition and preventive healthcare
+
+### **Previous Conversation:**
+{formatted_history}
+
+---
+
+### **User's Query:**
+{message}
+
+---
+
+### **Response Strategy:**
+
+1️⃣ **Medical Explanation & Diagnosis:**
+   - If the user asks a **general medical question**, provide a **concise, factual answer**.
+   - If the user **describes symptoms**, suggest **possible medical conditions** based on symptoms.
+   - If necessary, ask for **one additional investigation or symptom clarification**.
+
+2️⃣ **Treatment & Remedies:**
+   - After identifying possible conditions, **suggest treatments**.
+   - Include **simple home remedies, lifestyle changes, and precautions**.
+   - Suggest **over-the-counter medications (if applicable and safe)**.
+
+3️⃣ **User Engagement & Next Steps:**
+   - Ask the user if they **want to explore possible medications and remedies**.
+   - If they agree, **list safe and general treatment options**.
+   - Remind them to **consult a healthcare provider for confirmation**.
+
+---
+
+⚠️ **Important Notes:**
+- **Do NOT provide final diagnoses.** Clearly state that this is an **AI-based assumption**.
+- Keep responses **concise, supportive, and medically accurate**.
+- Always **recommend consulting a medical professional for confirmation**.
+"""
+
+
+def _chunk_to_text(chunk) -> str:
+    content = getattr(chunk, "content", "")
+    if isinstance(content, str):
+        return content
+    if isinstance(content, list):
+        texts = []
+        for item in content:
+            if isinstance(item, str):
+                texts.append(item)
+            elif isinstance(item, dict):
+                text = item.get("text", "")
+                if text:
+                    texts.append(text)
+        return "".join(texts)
+    return str(content) if content else ""
+
+
+def _yield_small_chunks(text: str, chunk_size: int = STREAM_CHUNK_SIZE) -> Iterator[str]:
+    """Split large model chunks so frontend updates are visibly incremental."""
+    if not text:
+        return
+
+    for i in range(0, len(text), chunk_size):
+        yield text[i:i + chunk_size]
+
+
+def stream_chat_response(message: str, session_id: str) -> Iterator[str]:
+    chat_history = get_chat_history(session_id)
+
+    if is_health_reminder_request(message):
+        _, reminder_response = create_health_calendar_reminder(message, session_id)
+        chat_history.append(HumanMessage(content=message))
+        chat_history.append(AIMessage(content=reminder_response))
+        yield reminder_response
+        return
+
+    formatted_history = "\n".join([
+        f"User: {msg.content}" if isinstance(msg, HumanMessage)
+        else f"AI: {msg.content}"
+        for msg in chat_history
+    ])
+    prompt_template = build_medical_prompt(message, formatted_history)
+
+    chunks: List[str] = []
+    try:
+        for chunk in llm.stream(prompt_template):
+            piece = _chunk_to_text(chunk)
+            if piece:
+                chunks.append(piece)
+                for small_piece in _yield_small_chunks(piece):
+                    yield small_piece
+                    if STREAM_DELAY_MS > 0:
+                        time.sleep(STREAM_DELAY_MS / 1000.0)
+    except Exception as e:
+        error_text = f"I hit an issue while generating a response: {e}"
+        chunks.append(error_text)
+        yield error_text
+    finally:
+        final_response = "".join(chunks).strip()
+        if final_response:
+            chat_history.append(HumanMessage(content=message))
+            chat_history.append(AIMessage(content=final_response))
+
+
 @app.get('/api/health', response_model=HealthResponse)
 async def health_check():
     return {"status": "healthy", "service": "HealthSphere AI API"}
@@ -180,52 +296,7 @@ async def ask_ai(request: ChatRequest):
             else f"AI: {msg.content}" 
             for msg in chat_history
         ])
-        
-        prompt_template = f"""
-You are **HealthSphere AI**, an expert medical AI specializing in **healthcare, medicine, and human biology**.  
-Your goal is to provide **accurate, science-backed answers** to **all medical-related questions**, including:
-- Medical conditions, symptoms, and treatments  
-- Human anatomy and physiology  
-- Neuroscience and mental health  
-- Pharmacology and common medications  
-- Medical research and advancements  
-- First aid and emergency care  
-- Nutrition and preventive healthcare  
-
-### **Previous Conversation:**
-{formatted_history}
-
----
-
-### **User's Query:**
-{message}
-
----
-
-### **Response Strategy:**
-
-1️⃣ **Medical Explanation & Diagnosis:**  
-   - If the user asks a **general medical question**, provide a **concise, factual answer**.  
-   - If the user **describes symptoms**, suggest **possible medical conditions** based on symptoms.  
-   - If necessary, ask for **one additional investigation or symptom clarification**.  
-
-2️⃣ **Treatment & Remedies:**  
-   - After identifying possible conditions, **suggest treatments**.  
-   - Include **simple home remedies, lifestyle changes, and precautions**.  
-   - Suggest **over-the-counter medications (if applicable and safe)**.  
-
-3️⃣ **User Engagement & Next Steps:**  
-   - Ask the user if they **want to explore possible medications and remedies**.  
-   - If they agree, **list safe and general treatment options**.  
-   - Remind them to **consult a healthcare provider for confirmation**.  
-
----
-
-⚠️ **Important Notes:**
-- **Do NOT provide final diagnoses.** Clearly state that this is an **AI-based assumption**.
-- Keep responses **concise, supportive, and medically accurate**.
-- Always **recommend consulting a medical professional for confirmation**.
-"""
+        prompt_template = build_medical_prompt(message, formatted_history)
         
         response = llm.invoke(prompt_template).content
         
@@ -239,6 +310,29 @@ Your goal is to provide **accurate, science-backed answers** to **all medical-re
         
     except Exception as e:
         print(f"Error in ask_ai: {str(e)}")
+        raise HTTPException(status_code=500, detail=str(e))
+
+
+@app.post('/api/ask-ai/stream')
+async def ask_ai_stream(request: ChatRequest):
+    try:
+        message = request.message
+        session_id = request.session_id
+
+        if not message:
+            raise HTTPException(status_code=400, detail="Message is required")
+
+        return StreamingResponse(
+            stream_chat_response(message, session_id),
+            media_type='text/plain; charset=utf-8',
+            headers={
+                "Cache-Control": "no-cache",
+                "Connection": "keep-alive",
+                "X-Accel-Buffering": "no"
+            }
+        )
+    except Exception as e:
+        print(f"Error in ask_ai_stream: {str(e)}")
         raise HTTPException(status_code=500, detail=str(e))
 
 
