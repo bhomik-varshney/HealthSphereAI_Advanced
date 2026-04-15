@@ -18,9 +18,16 @@ if [ ! -f "api.py" ]; then
     exit 1
 fi
 
+# Load environment variables from .env if present
+if [ -f ".env" ]; then
+    set -a
+    source .env
+    set +a
+fi
+
 # Start backend
 echo -e "${BLUE}📡 Starting Flask API Backend...${NC}"
-echo "   URL: http://localhost:5000"
+echo "   URL: http://localhost:5001"
 echo ""
 
 # Activate virtual environment if it exists
@@ -39,7 +46,7 @@ echo "⏳ Waiting for backend to be ready..."
 sleep 3
 
 # Check if backend is running
-if curl -s http://localhost:5000/api/health > /dev/null 2>&1; then
+if curl -s http://localhost:5001/api/health > /dev/null 2>&1; then
     echo -e "${GREEN}✓ Backend is ready!${NC}"
 else
     echo -e "${YELLOW}⚠ Backend might still be starting...${NC}"
@@ -62,7 +69,7 @@ echo "════════════════════════�
 echo -e "${GREEN}🎉 HealthSphere AI is running!${NC}"
 echo ""
 echo "📱 Frontend: http://localhost:5173"
-echo "📡 Backend:  http://localhost:5000"
+echo "📡 Backend:  http://localhost:5001"
 echo ""
 echo "Press Ctrl+C to stop both services"
 echo "═══════════════════════════════════════════════════"
