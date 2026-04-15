@@ -17,6 +17,8 @@ import spacy
 from PIL import Image
 from io import BytesIO
 from typing import Optional, List, Tuple
+import requests
+import re
 
 app = FastAPI(title="HealthSphere AI API", version="1.0.0")
 
@@ -65,6 +67,80 @@ class HealthResponse(BaseModel):
     service: str
 
 
+CALENDAR_AGENT_URL = os.environ.get("CALENDAR_AGENT_URL", "http://localhost:8000/calendar")
+
+
+def is_health_reminder_request(message: str) -> bool:
+    """Heuristic detection for medicine/health reminder scheduling requests."""
+    text = message.lower()
+
+    reminder_terms = [
+        "remind", "reminder", "set reminder", "schedule", "add event",
+        "calendar", "alert", "notify", "notification"
+    ]
+    health_terms = [
+        "medicine", "medication", "tablet", "pill", "dose", "insulin",
+        "vitamin", "syrup", "capsule", "doctor", "appointment", "checkup",
+        "bp", "blood pressure", "sugar", "glucose", "workout", "walk",
+        "health"
+    ]
+
+    has_reminder_intent = any(term in text for term in reminder_terms)
+    has_health_context = any(term in text for term in health_terms)
+
+    # Support direct scheduling statements like:
+    # "take BP medicine at 1pm tomorrow"
+    instruction_terms = [
+        "take", "have", "do", "start", "continue", "check", "measure",
+        "i need to", "i have to", "need to", "every day", "daily", "every"
+    ]
+    temporal_terms = [
+        "today", "tomorrow", "tonight", "morning", "afternoon", "evening",
+        "night", "monday", "tuesday", "wednesday", "thursday", "friday",
+        "saturday", "sunday", "weekly", "monthly", "at ", "on ", "by "
+    ]
+    time_pattern = r"\b\d{1,2}(:\d{2})?\s?(am|pm)\b"
+
+    has_instruction_intent = any(term in text for term in instruction_terms)
+    has_temporal_context = any(term in text for term in temporal_terms) or bool(re.search(time_pattern, text))
+    direct_health_schedule_intent = has_health_context and has_instruction_intent and has_temporal_context
+
+    return (has_reminder_intent and has_health_context) or direct_health_schedule_intent
+
+
+def create_health_calendar_reminder(message: str, session_id: str) -> Tuple[bool, str]:
+    """Forward reminder requests to the calendar agent service."""
+    try:
+        payload = {
+            "message": message,
+            "thread_id": f"healthsphere_{session_id}"
+        }
+
+        response = requests.post(CALENDAR_AGENT_URL, json=payload, timeout=30)
+        response.raise_for_status()
+        data = response.json()
+
+        calendar_text = data.get("response", "")
+        has_error = bool(data.get("error"))
+
+        if has_error:
+            return False, f"I could not create that reminder due to a calendar error: {data.get('error')}"
+
+        return True, (
+            "I created your health reminder in Google Calendar.\n\n"
+            f"Calendar agent response: {calendar_text}"
+        )
+
+    except requests.exceptions.RequestException as exc:
+        return False, (
+            "I understood your reminder request, but the calendar service is unreachable right now. "
+            "Please ensure the calendar agent is running on port 8000, then try again. "
+            f"Details: {exc}"
+        )
+    except Exception as exc:
+        return False, f"I could not create the reminder due to an unexpected error: {exc}"
+
+
 def get_chat_history(session_id: str):
     if session_id not in chat_sessions:
         chat_sessions[session_id] = []
@@ -86,6 +162,18 @@ async def ask_ai(request: ChatRequest):
             raise HTTPException(status_code=400, detail="Message is required")
         
         chat_history = get_chat_history(session_id)
+
+        # Route medicine/health reminder requests to Google Calendar agent.
+        if is_health_reminder_request(message):
+            success, reminder_response = create_health_calendar_reminder(message, session_id)
+
+            chat_history.append(HumanMessage(content=message))
+            chat_history.append(AIMessage(content=reminder_response))
+
+            return {
+                "response": reminder_response,
+                "session_id": session_id
+            }
         
         formatted_history = "\n".join([
             f"User: {msg.content}" if isinstance(msg, HumanMessage) 
