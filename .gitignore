@@ -26,3 +26,5 @@ healthsphere-ui/.env.local
 
 # VS Code
 .vscode/
+DLmodels/DenseNet121_best.keras
+DLmodels/new_brain_tumor_DenseNet121.keras
