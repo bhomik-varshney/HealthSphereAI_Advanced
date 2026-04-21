@@ -1,5 +1,6 @@
-import { Dumbbell, Target, Activity, Heart, Trophy, Calendar } from "lucide-react";
+import { Dumbbell, Target, Activity, Heart, Trophy, Calendar, Apple, Flame, ArrowRight } from "lucide-react";
 import { useEffect, useState } from "react";
+import { Link } from "react-router-dom";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Progress } from "@/components/ui/progress";
@@ -260,6 +261,205 @@ export default function Fitness() {
           </Card>
         </div>
       </div>
+
+      {/* Calorie Counter Promotion Section */}
+      <div className="mt-10">
+        <Card className="border-0 bg-gradient-to-br from-cyan-50 via-teal-50 to-emerald-50 shadow-xl overflow-hidden relative">
+          {/* Animated background elements */}
+          <div className="absolute inset-0 overflow-hidden">
+            <div className="absolute top-0 right-0 h-48 w-48 rounded-full bg-teal-400 blur-3xl opacity-12 animate-pulse" />
+            <div className="absolute bottom-0 left-0 h-40 w-40 rounded-full bg-emerald-400 blur-2xl opacity-12 animate-pulse" />
+            <div className="absolute top-1/2 left-1/2 h-32 w-32 rounded-full bg-cyan-300 blur-3xl opacity-10 animate-pulse" />
+          </div>
+
+          <CardContent className="relative p-6 md:p-8">
+            <div className="grid gap-6 lg:grid-cols-2 items-center">
+              {/* Left side - Content with Icons */}
+              <div className="space-y-4">
+                {/* Icon Row */}
+                <div className="flex items-center gap-3">
+                  <div className="flex h-12 w-12 items-center justify-center rounded-lg bg-gradient-to-br from-teal-400 to-teal-600 shadow-md transform hover:scale-110 transition-transform">
+                    <Apple className="h-6 w-6 text-white" />
+                  </div>
+                  <div className="flex h-12 w-12 items-center justify-center rounded-lg bg-gradient-to-br from-emerald-400 to-emerald-600 shadow-md transform hover:scale-110 transition-transform">
+                    <Flame className="h-6 w-6 text-white" />
+                  </div>
+                  <div className="flex h-12 w-12 items-center justify-center rounded-lg bg-gradient-to-br from-cyan-400 to-cyan-600 shadow-md transform hover:scale-110 transition-transform">
+                    <Heart className="h-6 w-6 text-white" />
+                  </div>
+                </div>
+                
+                <div>
+                  <h2 className="text-3xl font-bold bg-gradient-to-r from-teal-600 to-emerald-600 bg-clip-text text-transparent mb-2">
+                    Track Your Nutrition
+                  </h2>
+                  <p className="text-base text-muted-foreground mb-3 leading-snug">
+                    Complement your workouts with intelligent meal tracking. Our AI-powered Calorie Counter analyzes your food images to provide instant nutritional insights.
+                  </p>
+                </div>
+
+                {/* Features with better icons */}
+                <div className="space-y-2 bg-white/40 backdrop-blur-sm rounded-lg p-3 border border-white/50">
+                  <div className="flex items-center gap-2">
+                    <div className="flex h-6 w-6 items-center justify-center rounded-md bg-teal-500/20">
+                      <div className="h-1 w-1 rounded-full bg-teal-600" />
+                    </div>
+                    <span className="text-xs font-medium text-foreground">AI-Powered Food Recognition</span>
+                  </div>
+                  <div className="flex items-center gap-2">
+                    <div className="flex h-6 w-6 items-center justify-center rounded-md bg-teal-500/20">
+                      <div className="h-1 w-1 rounded-full bg-teal-600" />
+                    </div>
+                    <span className="text-xs font-medium text-foreground">Real-time Calorie & Macro Analysis</span>
+                  </div>
+                  <div className="flex items-center gap-2">
+                    <div className="flex h-6 w-6 items-center justify-center rounded-md bg-teal-500/20">
+                      <div className="h-1 w-1 rounded-full bg-teal-600" />
+                    </div>
+                    <span className="text-xs font-medium text-foreground">Personalized Nutrition Insights</span>
+                  </div>
+                </div>
+
+                <Link to="/calorie-counter">
+                  <Button 
+                    className="mt-4 bg-gradient-to-r from-teal-500 to-emerald-500 hover:from-teal-600 hover:to-emerald-600 text-white shadow-lg hover:shadow-xl transition-all transform hover:scale-105 w-full md:w-auto rounded-xl border-0 font-semibold tracking-wide"
+                    size="lg"
+                  >
+                    <Apple className="h-6 w-6 mr-2" />
+                    Start Tracking
+                    <ArrowRight className="h-6 w-6 ml-2" />
+                  </Button>
+                </Link>
+              </div>
+
+              {/* Right side - Enhanced Visual with animated cards */}
+              <div className="hidden lg:block">
+                <div className="relative h-80 w-full">
+                  {/* Main stat card - Large centered */}
+                  <div className="absolute top-0 left-1/2 transform -translate-x-1/2 w-96">
+                    <div className="rounded-xl bg-white/70 backdrop-blur-md border-2 border-white/60 p-5 shadow-lg hover:shadow-xl transition-all transform hover:scale-105 hover:-translate-y-1">
+                      <div className="flex items-center justify-between mb-4">
+                        <span className="text-xs font-semibold text-foreground">Daily Intake</span>
+                        <div className="flex items-center gap-1.5 bg-emerald-100/60 px-2 py-1 rounded-full">
+                          <div className="h-1.5 w-1.5 rounded-full bg-emerald-500 animate-pulse" />
+                          <span className="text-xs font-medium text-emerald-700">On Track</span>
+                        </div>
+                      </div>
+                      <div className="space-y-3">
+                        <div>
+                          <p className="text-4xl font-bold text-transparent bg-gradient-to-r from-teal-600 to-emerald-600 bg-clip-text">
+                            2,150
+                          </p>
+                          <p className="text-xs text-muted-foreground">kcal consumed</p>
+                        </div>
+                        <div className="space-y-1.5">
+                          <div className="w-full bg-gray-200 rounded-full h-2 overflow-hidden">
+                            <div className="bg-gradient-to-r from-teal-500 to-emerald-500 h-2 rounded-full" style={{ width: '75%' }} />
+                          </div>
+                          <div className="flex justify-between text-xs">
+                            <span className="text-muted-foreground">75% of goal</span>
+                            <span className="font-semibold text-teal-600">650 kcal left</span>
+                          </div>
+                        </div>
+                      </div>
+                    </div>
+                  </div>
+
+                  {/* Macros card - Bottom Left */}
+                  <div className="absolute bottom-0 left-0 w-44">
+                    <div className="rounded-lg bg-white/60 backdrop-blur border border-white/50 p-4 shadow-md hover:shadow-lg transition-all transform hover:scale-110 hover:-translate-y-1">
+                      <div className="flex items-center justify-between mb-3">
+                        <div className="flex items-center gap-2">
+                          <div className="flex h-6 w-6 items-center justify-center rounded-md bg-teal-100/60">
+                            <span className="text-xs font-bold text-teal-700">P</span>
+                          </div>
+                          <span className="text-xs font-semibold text-foreground">Protein</span>
+                        </div>
+                        <div className="text-xs font-bold text-teal-600">45%</div>
+                      </div>
+                      <div className="space-y-1.5">
+                        <div className="w-full bg-gray-200 rounded-full h-2">
+                          <div className="bg-gradient-to-r from-teal-400 to-teal-500 h-2 rounded-full" style={{ width: '45%' }} />
+                        </div>
+                        <p className="text-xs text-muted-foreground">120g / 266g</p>
+                      </div>
+                    </div>
+                  </div>
+
+                  {/* Carbs card - Bottom Right */}
+                  <div className="absolute bottom-0 right-0 w-44">
+                    <div className="rounded-lg bg-white/60 backdrop-blur border border-white/50 p-4 shadow-md hover:shadow-lg transition-all transform hover:scale-110 hover:-translate-y-1">
+                      <div className="flex items-center justify-between mb-3">
+                        <div className="flex items-center gap-2">
+                          <div className="flex h-6 w-6 items-center justify-center rounded-md bg-emerald-100/60">
+                            <span className="text-xs font-bold text-emerald-700">C</span>
+                          </div>
+                          <span className="text-xs font-semibold text-foreground">Carbs</span>
+                        </div>
+                        <div className="text-xs font-bold text-emerald-600">35%</div>
+                      </div>
+                      <div className="space-y-1.5">
+                        <div className="w-full bg-gray-200 rounded-full h-2">
+                          <div className="bg-gradient-to-r from-emerald-400 to-emerald-500 h-2 rounded-full" style={{ width: '35%' }} />
+                        </div>
+                        <p className="text-xs text-muted-foreground">220g / 625g</p>
+                      </div>
+                    </div>
+                  </div>
+
+                  {/* Fats card - Middle */}
+                  <div className="absolute left-1/2 bottom-0 transform -translate-x-1/2 w-40">
+                    <div className="rounded-lg bg-white/60 backdrop-blur border border-white/50 p-4 shadow-md hover:shadow-lg transition-all transform hover:scale-110 hover:-translate-y-1">
+                      <div className="flex items-center justify-between mb-3">
+                        <div className="flex items-center gap-2">
+                          <div className="flex h-6 w-6 items-center justify-center rounded-md bg-cyan-100/60">
+                            <span className="text-xs font-bold text-cyan-700">F</span>
+                          </div>
+                          <span className="text-xs font-semibold text-foreground">Fats</span>
+                        </div>
+                        <div className="text-xs font-bold text-cyan-600">20%</div>
+                      </div>
+                      <div className="space-y-1.5">
+                        <div className="w-full bg-gray-200 rounded-full h-2">
+                          <div className="bg-gradient-to-r from-cyan-400 to-cyan-500 h-2 rounded-full" style={{ width: '20%' }} />
+                        </div>
+                        <p className="text-xs text-muted-foreground">60g / 300g</p>
+                      </div>
+                    </div>
+                  </div>
+                </div>
+              </div>
+
+              {/* Mobile View - Simplified Cards */}
+              <div className="lg:hidden">
+                <div className="grid grid-cols-3 gap-2">
+                  {/* Card 1 */}
+                  <div className="rounded-lg bg-white/60 backdrop-blur border border-white/50 p-2 text-center hover:shadow-md transition-all">
+                    <Flame className="h-5 w-5 text-teal-600 mx-auto mb-1 animate-pulse" />
+                    <p className="text-lg font-bold text-foreground">2,150</p>
+                    <p className="text-xs text-muted-foreground">Calories</p>
+                  </div>
+
+                  {/* Card 2 */}
+                  <div className="rounded-lg bg-white/60 backdrop-blur border border-white/50 p-2 text-center hover:shadow-md transition-all">
+                    <div className="h-5 w-5 rounded-full bg-gradient-to-r from-teal-400 to-teal-500 mx-auto mb-1" />
+                    <p className="text-lg font-bold text-foreground">45%</p>
+                    <p className="text-xs text-muted-foreground">Protein</p>
+                  </div>
+
+                  {/* Card 3 */}
+                  <div className="rounded-lg bg-white/60 backdrop-blur border border-white/50 p-2 text-center hover:shadow-md transition-all">
+                    <div className="h-5 w-5 rounded-full bg-gradient-to-r from-emerald-400 to-emerald-500 mx-auto mb-1" />
+                    <p className="text-lg font-bold text-foreground">35%</p>
+                    <p className="text-xs text-muted-foreground">Carbs</p>
+                  </div>
+                </div>
+              </div>
+            </div>
+          </CardContent>
+        </Card>
+      </div>
     </div>
   );
 }
+

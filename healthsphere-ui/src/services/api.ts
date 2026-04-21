@@ -82,6 +82,49 @@ interface ErrorResponse {
 }
 
 /**
+ * Calorie counter types
+ */
+export interface FoodItem {
+  item_name: string;
+  visual_reasoning: string;
+  estimated_portion: string;
+  portion_guessed: boolean;
+}
+
+export interface CalorieCounterResponse {
+  detected_foods: FoodItem[];
+  total_calories: number;
+  total_protein: number;
+  total_carbs: number;
+  total_fat: number;
+  error: string;
+}
+
+/**
+ * X-Ray disease prediction types
+ */
+export interface XRayPredictionResponse {
+  primary_diagnosis: string;
+  confidence: number;
+  is_normal: boolean;
+  probabilities: { [key: string]: number };
+  warning_message: string | null;
+  error: string;
+}
+
+/**
+ * Brain Tumor prediction types
+ */
+export interface TumorPredictionResponse {
+  primary_diagnosis: string;
+  confidence: number;
+  is_normal: boolean;
+  probabilities: { [key: string]: number };
+  warning_message: string | null;
+  error: string;
+}
+
+/**
  * Helper function to handle API errors
  */
 async function handleResponse<T>(response: Response): Promise<T> {
@@ -281,4 +324,55 @@ export async function stopTrainer(): Promise<TrainerStatusResponse> {
  */
 export function generateSessionId(): string {
   return `session_${Date.now()}_${Math.random().toString(36).substring(7)}`;
+}
+
+/**
+ * Analyze meal from image for calorie and macro information
+ * @param file - Image file of the meal
+ * @returns Calorie counter response with detected foods and nutritional info
+ */
+export async function analyzeMealImage(file: File): Promise<CalorieCounterResponse> {
+  const formData = new FormData();
+  formData.append('file', file);
+
+  const response = await fetch(`${API_BASE_URL}/calories/analyze`, {
+    method: 'POST',
+    body: formData,
+  });
+
+  return handleResponse<CalorieCounterResponse>(response);
+}
+
+/**
+ * Predict lung disease from chest X-ray image
+ * @param file - X-ray image file
+ * @returns X-ray prediction response with diagnosis and confidence
+ */
+export async function predictXRayDisease(file: File): Promise<XRayPredictionResponse> {
+  const formData = new FormData();
+  formData.append('file', file);
+
+  const response = await fetch(`${API_BASE_URL}/scan-test-ai/predict`, {
+    method: 'POST',
+    body: formData,
+  });
+
+  return handleResponse<XRayPredictionResponse>(response);
+}
+
+/**
+ * Predict brain tumor from MRI image
+ * @param file - Brain MRI image file
+ * @returns Tumor prediction response with diagnosis and confidence
+ */
+export async function predictTumorDisease(file: File): Promise<TumorPredictionResponse> {
+  const formData = new FormData();
+  formData.append('file', file);
+
+  const response = await fetch(`${API_BASE_URL}/tumor-vision-ai/predict`, {
+    method: 'POST',
+    body: formData,
+  });
+
+  return handleResponse<TumorPredictionResponse>(response);
 }

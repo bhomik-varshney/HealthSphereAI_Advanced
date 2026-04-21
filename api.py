@@ -12,15 +12,26 @@ import subprocess
 import sys
 import pandas as pd
 import os
+from dotenv import load_dotenv
 import pdfplumber
 import pytesseract
 import spacy
 from PIL import Image
 from io import BytesIO
-from typing import Optional, List, Tuple, Iterator
+from typing import Optional, List, Tuple, Iterator, Dict, Any
 import requests
 import re
 import time
+import base64
+import json
+import tensorflow as tf
+import numpy as np
+
+# Import calorie counter graph
+from calorie_counter.graph1 import build_calorie_graph
+
+# Load environment variables from .env file
+load_dotenv()
 
 app = FastAPI(title="HealthSphere AI API", version="1.0.0")
 
@@ -36,6 +47,53 @@ app.add_middleware(
 # Initialize AI model
 API_KEY = os.environ.get("GROQ_API_KEY", "")
 llm = ChatGroq(model="llama-3.3-70b-versatile", api_key=API_KEY)
+
+# Build and invoke the calorie graph
+calorie_app = build_calorie_graph()
+
+# ==========================================
+# XRAY DISEASE PREDICTION MODEL
+# ==========================================
+# Load the DenseNet121 model for X-ray analysis
+def load_xray_model():
+    """Load the pre-trained DenseNet121 model for X-ray disease prediction."""
+    try:
+        model_path = os.path.join(os.path.dirname(__file__), "DLmodels", "DenseNet121_best.keras")
+        if os.path.exists(model_path):
+            model = tf.keras.models.load_model(model_path)
+            print(f"✓ X-Ray disease prediction model loaded successfully from {model_path}")
+            return model
+        else:
+            print(f"⚠ Model not found at {model_path}")
+            return None
+    except Exception as e:
+        print(f"⚠ Could not load X-Ray model: {str(e)}")
+        return None
+
+xray_model = load_xray_model()
+XRAY_CLASS_NAMES = ['Covid', 'Lung Opacity', 'Normal', 'Pneumonia']
+
+# ==========================================
+# TUMOR VISION AI PREDICTION MODEL
+# ==========================================
+# Load the DenseNet121 model for brain tumor analysis
+def load_tumor_model():
+    """Load the pre-trained DenseNet121 model for brain tumor prediction."""
+    try:
+        model_path = os.path.join(os.path.dirname(__file__), "DLmodels", "new_brain_tumor_DenseNet121.keras")
+        if os.path.exists(model_path):
+            model = tf.keras.models.load_model(model_path)
+            print(f"✓ Brain tumor prediction model loaded successfully from {model_path}")
+            return model
+        else:
+            print(f"⚠ Model not found at {model_path}")
+            return None
+    except Exception as e:
+        print(f"⚠ Could not load Tumor model: {str(e)}")
+        return None
+
+tumor_model = load_tumor_model()
+TUMOR_CLASS_NAMES = ['Glioma', 'Meningioma', 'No Tumor', 'Pituitary']
 
 # Load spaCy model for NER
 try:
@@ -75,6 +133,24 @@ class TrainerStatusResponse(BaseModel):
     running: bool
     pid: Optional[int] = None
     message: str
+
+
+class XRayPredictionResponse(BaseModel):
+    primary_diagnosis: str
+    confidence: float
+    is_normal: bool
+    probabilities: Dict[str, float]
+    warning_message: Optional[str] = None
+    error: str = ""
+
+
+class TumorPredictionResponse(BaseModel):
+    primary_diagnosis: str
+    confidence: float
+    is_normal: bool
+    probabilities: Dict[str, float]
+    warning_message: Optional[str] = None
+    error: str = ""
 
 
 CALENDAR_AGENT_URL = os.environ.get("CALENDAR_AGENT_URL", "http://localhost:8000/calendar")
@@ -618,7 +694,10 @@ async def search_hospitals(request: HospitalSearchRequest):
         python_exe = sys.executable
         search_query = f"hospitals {search_type} {location}"
         command = [python_exe, "scraper.py", "-s", search_query, "-t", "50"]
-        process = subprocess.run(command, capture_output=True, text=True, cwd=os.path.dirname(os.path.abspath(__file__)))
+        
+        # Run from project root directory
+        project_root = os.path.dirname(os.path.abspath(__file__))
+        process = subprocess.run(command, capture_output=True, text=True, cwd=project_root)
         
         if process.returncode != 0:
             raise HTTPException(status_code=500, detail={
@@ -626,10 +705,42 @@ async def search_hospitals(request: HospitalSearchRequest):
                 "details": process.stderr
             })
         
-        file_path = f"output/hospitals_data_hospitals_{search_type.replace(' ', '_')}_{location.replace(' ', '_')}.csv"
+        # Use flexible glob pattern matching (like Streamlit app)
+        import glob as glob_module
+        from pathlib import Path
+        
+        output_dir = Path(project_root) / "output"
+        
+        # Try multiple patterns to find the CSV file
+        patterns = [
+            f"hospitals_data_*{location.replace(' ', '_')}*.csv",
+            f"hospitals_data_*{location.lower().replace(' ', '_')}*.csv",
+            f"hospitals_data_{search_query.replace(' ', '_')}*.csv",
+        ]
+        
+        matching_files = []
+        for pattern in patterns:
+            matching_files = list(output_dir.glob(pattern))
+            if matching_files:
+                break
+        
+        # Last resort: use most recently modified CSV
+        if not matching_files:
+            all_csv_files = list(output_dir.glob("*.csv"))
+            if all_csv_files:
+                matching_files = [max(all_csv_files, key=lambda p: p.stat().st_mtime)]
+        
+        if not matching_files:
+            raise HTTPException(status_code=404, detail={
+                "error": "No hospitals data found",
+                "message": "The scraper may have encountered an issue or no results were found",
+                "searched_location": location
+            })
+        
+        file_path = matching_files[0]
         
         try:
-            data = pd.read_csv(file_path)
+            data = pd.read_csv(file_path, encoding='utf-8')
             
             if data.empty:
                 return {
@@ -650,20 +761,42 @@ async def search_hospitals(request: HospitalSearchRequest):
                 "scraper_output": process.stdout
             }
             
-        except FileNotFoundError:
-            raise HTTPException(status_code=404, detail={
-                "error": "No hospitals data found",
-                "message": "The scraper may have encountered an issue or no results were found"
-            })
+        except UnicodeDecodeError:
+            # Try with different encoding
+            data = pd.read_csv(file_path, encoding='latin-1')
+            
+            if data.empty:
+                return {
+                    "hospitals": [],
+                    "count": 0,
+                    "location": location,
+                    "message": "No hospitals found in this area"
+                }
+            
+            data = data.where(pd.notnull(data), None)
+            hospitals = data.to_dict('records')
+            
+            return {
+                "hospitals": hospitals,
+                "count": len(hospitals),
+                "location": location,
+                "scraper_output": process.stdout
+            }
+            
         except pd.errors.EmptyDataError:
             raise HTTPException(status_code=400, detail={
                 "error": "Invalid location",
                 "message": "There is no such place or you have entered wrong location"
             })
             
+    except HTTPException:
+        raise
     except Exception as e:
         print(f"Error in search_hospitals: {str(e)}")
-        raise HTTPException(status_code=500, detail=str(e))
+        raise HTTPException(status_code=500, detail={
+            "error": "Search failed",
+            "message": str(e)
+        })
 
 
 @app.post('/api/hospitals/geocode')
@@ -693,6 +826,172 @@ async def geocode_location(request: GeocodeRequest):
     except Exception as e:
         print(f"Error in geocode_location: {str(e)}")
         raise HTTPException(status_code=500, detail=str(e))
+
+
+# ==========================================
+# CALORIE COUNTER ENDPOINT
+# ==========================================
+
+@app.post('/api/calories/analyze')
+async def analyze_meal(file: UploadFile = File(...)):
+    """Analyze food in image and calculate calories/macros using LangGraph pipeline."""
+    try:
+        # Read and encode image as base64
+        contents = await file.read()
+        image_base64 = base64.b64encode(contents).decode('utf-8')
+        
+        initial_state = {
+            "image_base64": image_base64,
+            "detected_foods": [],
+            "total_calories": 0,
+            "total_protein": 0.0,
+            "total_carbs": 0.0,
+            "total_fat": 0.0,
+            "error": ""
+        }
+        
+        # Execute the LangGraph pipeline
+        result_state = calorie_app.invoke(initial_state)
+        
+        return result_state
+        
+    except Exception as e:
+        print(f"Error in analyze_meal: {str(e)}")
+        raise HTTPException(status_code=500, detail=str(e))
+
+
+# ==========================================
+# XRAY SCAN DISEASE PREDICTION ENDPOINT
+# ==========================================
+
+@app.post('/api/scan-test-ai/predict', response_model=XRayPredictionResponse)
+async def predict_xray_disease(file: UploadFile = File(...)) -> XRayPredictionResponse:
+    """Predict lung disease from chest X-ray image using DenseNet121 model."""
+    try:
+        # Check if model is loaded
+        if xray_model is None:
+            return XRayPredictionResponse(
+                primary_diagnosis="",
+                confidence=0.0,
+                is_normal=False,
+                probabilities={},
+                error="X-Ray model not loaded. Please check model file.",
+                warning_message=None
+            )
+        
+        # Read and open image
+        contents = await file.read()
+        image = Image.open(BytesIO(contents)).convert('RGB')
+        
+        # Resize image to model input size (224x224)
+        img_resized = image.resize((224, 224))
+        img_array = tf.keras.preprocessing.image.img_to_array(img_resized)
+        img_array = np.expand_dims(img_array, axis=0)
+        
+        # Make prediction
+        predictions = xray_model.predict(img_array)[0]
+        
+        # Get primary diagnosis
+        winning_index = np.argmax(predictions)
+        winning_class = XRAY_CLASS_NAMES[winning_index]
+        winning_confidence = float(predictions[winning_index])
+        
+        # Build probabilities dictionary
+        probabilities = {
+            class_name: float(prob)
+            for class_name, prob in zip(XRAY_CLASS_NAMES, predictions)
+        }
+        
+        # Determine if normal and set warning message
+        is_normal = winning_class == "Normal"
+        warning_message = None
+        if not is_normal:
+            warning_message = "⚠️ Immediate radiologist review recommended."
+        
+        return XRayPredictionResponse(
+            primary_diagnosis=winning_class,
+            confidence=winning_confidence,
+            is_normal=is_normal,
+            probabilities=probabilities,
+            warning_message=warning_message,
+            error=""
+        )
+        
+    except Exception as e:
+        print(f"Error in predict_xray_disease: {str(e)}")
+        return XRayPredictionResponse(
+            primary_diagnosis="",
+            confidence=0.0,
+            is_normal=False,
+            probabilities={},
+            error=f"Failed to analyze X-Ray: {str(e)}",
+            warning_message=None
+        )
+
+
+@app.post('/api/tumor-vision-ai/predict', response_model=TumorPredictionResponse)
+async def predict_tumor_disease(file: UploadFile = File(...)) -> TumorPredictionResponse:
+    """Predict brain tumor type from MRI image using EfficientNetB0 model."""
+    try:
+        # Check if model is loaded
+        if tumor_model is None:
+            return TumorPredictionResponse(
+                primary_diagnosis="",
+                confidence=0.0,
+                is_normal=False,
+                probabilities={},
+                error="Brain Tumor model not loaded. Please check model file.",
+                warning_message=None
+            )
+        
+        # Read and open image
+        contents = await file.read()
+        image = Image.open(BytesIO(contents)).convert('RGB')
+        
+        # Resize image to model input size (224x224)
+        img_resized = image.resize((224, 224))
+        img_array = tf.keras.preprocessing.image.img_to_array(img_resized)
+        img_array = np.expand_dims(img_array, axis=0)
+        
+        # Make prediction
+        predictions = tumor_model.predict(img_array)[0]
+        
+        # Get primary diagnosis
+        winning_index = np.argmax(predictions)
+        winning_class = TUMOR_CLASS_NAMES[winning_index]
+        winning_confidence = float(predictions[winning_index])
+        
+        # Build probabilities dictionary
+        probabilities = {
+            class_name: float(prob)
+            for class_name, prob in zip(TUMOR_CLASS_NAMES, predictions)
+        }
+        
+        # Determine if normal and set warning message
+        is_normal = winning_class == "No Tumor"
+        warning_message = None
+        if not is_normal:
+            warning_message = "⚠️ Immediate neurologist review recommended."
+        
+        return TumorPredictionResponse(
+            primary_diagnosis=winning_class,
+            confidence=winning_confidence,
+            is_normal=is_normal,
+            probabilities=probabilities,
+            warning_message=warning_message,
+            error=""
+        )
+        
+    except Exception as e:
+        print(f"Error in predict_tumor_disease: {str(e)}")
+        return TumorPredictionResponse(
+            primary_diagnosis="",
+            confidence=0.0,
+            is_normal=False,
+            probabilities={},
+            error=f"Failed to analyze Brain MRI: {str(e)}",
+            warning_message=None
+        )
 
 
 if __name__ == '__main__':
