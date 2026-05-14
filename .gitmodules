@@ -1,0 +1,6 @@
+[submodule "AI_Gym_Trainer"]
+	path = AI_Gym_Trainer
+	url = https://github.com/bhomik-varshney/AI_Gym_Trainer.git
+[submodule "AI_agent_service"]
+	path = AI_agent_service
+	url = https://github.com/bhomik-varshney/AI_agent_service.git
