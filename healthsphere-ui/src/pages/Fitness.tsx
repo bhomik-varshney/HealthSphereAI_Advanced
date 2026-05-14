@@ -76,7 +76,7 @@ export default function Fitness() {
       const status = await startTrainer();
       setTrainerRunning(status.running);
       setTrainerPid(status.pid ?? null);
-      setTrainerMessage(`${status.message}. A trainer window should open on your system.`);
+      setTrainerMessage(status.message);
     } catch (error) {
       setTrainerMessage(error instanceof Error ? error.message : "Could not start AI Gym Trainer");
     } finally {

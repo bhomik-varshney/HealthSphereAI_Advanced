@@ -10,6 +10,7 @@ from langchain_core.messages import AIMessage, HumanMessage
 from langchain_groq import ChatGroq
 import subprocess
 import sys
+import shutil
 import pandas as pd
 import os
 from dotenv import load_dotenv
@@ -391,16 +392,104 @@ async def start_trainer():
         if not os.path.exists(trainer_script):
             raise HTTPException(status_code=404, detail="AI Gym Trainer script not found")
 
+        # Reset log for each start to make current run diagnostics clear.
+        try:
+            open(trainer_log_file, 'w', encoding='utf-8').close()
+        except Exception:
+            pass
+
+        env_python = os.environ.get("HEALTHSPHERE_TRAINER_PYTHON")
+
+        # If user provides an explicit interpreter, use it directly.
+        if env_python:
+            if not os.path.exists(env_python):
+                raise HTTPException(
+                    status_code=500,
+                    detail=(
+                        "HEALTHSPHERE_TRAINER_PYTHON points to a non-existing file: "
+                        f"{env_python}"
+                    )
+                )
+            python_executable = env_python
+        else:
+            py312_from_launcher = None
+            conda_python = None
+            try:
+                py_probe = subprocess.run(
+                    ["py", "-3.12", "-c", "import sys; print(sys.executable)"],
+                    capture_output=True,
+                    text=True,
+                    timeout=8
+                )
+                if py_probe.returncode == 0:
+                    py312_from_launcher = py_probe.stdout.strip()
+            except Exception:
+                py312_from_launcher = None
+
+            local_python312 = os.path.join(
+                os.environ.get("LOCALAPPDATA", ""),
+                "Programs", "Python", "Python312", "python.exe"
+            )
+
+            conda_prefix = os.environ.get("CONDA_PREFIX")
+            if conda_prefix:
+                candidate = os.path.join(conda_prefix, "python.exe")
+                if os.path.exists(candidate):
+                    conda_python = candidate
+
+        # Resolve a Python interpreter that has OpenCV + MediaPipe available.
+            python_candidates = [
+                conda_python,
+                py312_from_launcher,
+                local_python312 if os.path.exists(local_python312) else None,
+                sys.executable,
+                shutil.which("python"),
+            ]
+            python_candidates = [p for p in python_candidates if p]
+            seen = set()
+            python_candidates = [p for p in python_candidates if not (p in seen or seen.add(p))]
+
+            python_executable = None
+            check_code = (
+                "import cv2\n"
+                "import mediapipe as mp\n"
+                "print('ok')\n"
+            )
+            for candidate in python_candidates:
+                try:
+                    probe = subprocess.run(
+                        [candidate, "-c", check_code],
+                        cwd=trainer_dir,
+                        capture_output=True,
+                        text=True,
+                        timeout=25
+                    )
+                    if probe.returncode == 0:
+                        python_executable = candidate
+                        break
+                except Exception:
+                    continue
+
+            if not python_executable:
+                raise HTTPException(
+                    status_code=500,
+                    detail=(
+                        "Could not find a Python environment with mediapipe and opencv installed. "
+                        "Set HEALTHSPHERE_TRAINER_PYTHON to a valid python.exe."
+                    )
+                )
+
         log_handle = open(trainer_log_file, 'a', encoding='utf-8')
         trainer_process = subprocess.Popen(
-            [sys.executable, trainer_script],
+            [python_executable, trainer_script],
             cwd=trainer_dir,
             stdout=log_handle,
             stderr=log_handle
         )
+        log_handle.close()
 
-        # Catch immediate startup failures and surface logs to frontend.
-        time.sleep(1)
+        # Catch startup failures and surface logs to frontend.
+        time.sleep(3)
         if trainer_process.poll() is not None:
             details = ""
             try:
@@ -421,7 +510,7 @@ async def start_trainer():
         return {
             "running": True,
             "pid": trainer_process.pid,
-            "message": f"AI Gym Trainer started successfully (logs: {trainer_log_file})"
+            "message": f"AI Gym Trainer started successfully (logs: {trainer_log_file}, python: {python_executable})"
         }
     except HTTPException:
         raise
