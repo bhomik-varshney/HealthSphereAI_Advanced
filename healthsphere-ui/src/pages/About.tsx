@@ -78,23 +78,27 @@ export default function About() {
             </h2>
             <div className="space-y-4 text-muted-foreground">
               <p>
-                HealthSphere AI was born from a simple observation: navigating healthcare 
-                information is overwhelming. Between medical jargon, conflicting advice, 
-                and the anxiety of health concerns, people deserve a better way to 
-                understand their health.
-              </p>
-              <p>
-                We combined expertise in medicine, artificial intelligence, and user 
-                experience to create an AI health assistant that speaks your language. 
-                Whether you're trying to understand lab results, find the right hospital, 
-                or simply get answers to health questions, we're here to help.
-              </p>
-              <p>
-                Our AI is powered by the latest language models, trained on vast medical 
-                literature, and designed to provide accurate, empathetic responses. 
-                But we never forget: we're a complement to professional medical care, 
-                not a replacement.
-              </p>
+  HealthSphere AI was created with a simple mission: to make healthcare 
+  information easier, clearer, and more accessible for everyone. We saw how 
+  confusing medical terminology, endless online searches, and uncertainty 
+  around health concerns can leave people feeling overwhelmed and anxious.
+</p>
+
+<p>
+  By combining artificial intelligence with a user-focused experience, we 
+  built an AI health assistant that simplifies complex medical information 
+  into conversations people can actually understand. Whether you're analyzing 
+  medical reports, exploring medications, finding hospitals, or seeking health 
+  guidance, HealthSphere AI is designed to support you every step of the way.
+</p>
+
+<p>
+  Our platform is powered by advanced AI technology and built with the belief 
+  that healthcare should feel more human, understandable, and accessible. 
+  While HealthSphere AI helps users make more informed decisions, we always 
+  believe professional medical care comes first — our goal is to assist, 
+  educate, and empower, not replace healthcare professionals.
+</p>
             </div>
           </div>
         </CardContent>

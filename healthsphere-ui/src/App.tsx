@@ -8,6 +8,9 @@ import Home from "./pages/Home";
 import AskAI from "./pages/AskAI";
 import HospitalFinder from "./pages/HospitalFinder";
 import Fitness from "./pages/Fitness";
+import ScanTestAI from "./pages/ScanTestAI";
+import TumorVisionAI from "./pages/TumorVisionAI";
+import CalorieCounter from "./pages/CalorieCounter";
 import About from "./pages/About";
 import NotFound from "./pages/NotFound";
 
@@ -25,6 +28,9 @@ const App = () => (
             <Route path="/ask-ai" element={<AskAI />} />
             <Route path="/hospitals" element={<HospitalFinder />} />
             <Route path="/fitness" element={<Fitness />} />
+            <Route path="/scan-test-ai" element={<ScanTestAI />} />
+            <Route path="/tumor-vision-ai" element={<TumorVisionAI />} />
+            <Route path="/calorie-counter" element={<CalorieCounter />} />
             <Route path="/about" element={<About />} />
             {/* ADD ALL CUSTOM ROUTES ABOVE THE CATCH-ALL "*" ROUTE */}
             <Route path="*" element={<NotFound />} />

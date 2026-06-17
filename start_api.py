@@ -1,19 +1,20 @@
 #!/usr/bin/env python3
 """
-Simple script to start the API server in the background
+Simple script to start the API server
 """
 import subprocess
 import sys
 import os
 
-# Get the project directory
-project_dir = "/Users/bhomikvarshney/PycharmProjects/pythonProject(google maps scraper)"
-python_path = f"{project_dir}/.venv/bin/python"
-api_path = f"{project_dir}/api.py"
+# Get the project directory (script's parent directory)
+project_dir = os.path.dirname(os.path.abspath(__file__))
 
 print("Starting HealthSphere AI API Server...")
+print(f"Project Directory: {project_dir}")
 print(f"Backend URL: http://localhost:5001")
 
-# Start the server
+# Change to project directory
 os.chdir(project_dir)
-subprocess.run([python_path, api_path])
+
+# Run the API using the current Python interpreter via uvicorn
+subprocess.run([sys.executable, "-m", "uvicorn", "api:app", "--host", "0.0.0.0", "--port", "5001", "--reload"])

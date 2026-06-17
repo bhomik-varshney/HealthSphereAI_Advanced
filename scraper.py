@@ -138,7 +138,7 @@ def main():
             print("Saving data...")
             business_list.save_to_excel(f"hospitals_data_{search_for}".replace(' ', '_'))
             business_list.save_to_csv(f"hospitals_data_{search_for}".replace(' ', '_'))
-            print(f"✓ Data saved successfully!")
+            print("[OK] Data saved successfully!")
 
         browser.close()
         print("Scraping completed!")

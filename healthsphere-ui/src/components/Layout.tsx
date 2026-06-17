@@ -1,5 +1,5 @@
 import { useState } from "react";
-import { Link, useLocation } from "react-router-dom";
+import { Link, useLocation, useNavigate } from "react-router-dom";
 import { 
   Home, 
   MessageSquare, 
@@ -8,11 +8,23 @@ import {
   Info, 
   Menu, 
   X,
-  Activity
+  Activity,
+  Apple,
+  Scan,
+  Brain,
+  ChevronDown,
+  Stethoscope,
+  Wind
 } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { Button } from "@/components/ui/button";
 import { Sheet, SheetContent, SheetTrigger } from "@/components/ui/sheet";
+import {
+  DropdownMenu,
+  DropdownMenuContent,
+  DropdownMenuItem,
+  DropdownMenuTrigger,
+} from "@/components/ui/dropdown-menu";
 
 interface NavItem {
   label: string;
@@ -28,8 +40,14 @@ const navItems: NavItem[] = [
   { label: "About", href: "/about", icon: Info },
 ];
 
+const testAIOptions = [
+  { label: "Vital Lung AI", href: "/scan-test-ai", icon: Wind },
+  { label: "TumorVision AI", href: "/tumor-vision-ai", icon: Brain },
+];
+
 export function Layout({ children }: { children: React.ReactNode }) {
   const location = useLocation();
+  const navigate = useNavigate();
   const [mobileOpen, setMobileOpen] = useState(false);
 
   return (
@@ -49,7 +67,50 @@ export function Layout({ children }: { children: React.ReactNode }) {
 
           {/* Desktop Navigation */}
           <nav className="hidden items-center gap-1 md:flex">
-            {navItems.map((item) => {
+            {navItems.slice(0, 4).map((item) => {
+              const isActive = location.pathname === item.href;
+              return (
+                <Link
+                  key={item.href}
+                  to={item.href}
+                  className={cn(
+                    "flex items-center gap-2 rounded-lg px-3.5 py-2 text-sm font-medium transition-all duration-200",
+                    isActive
+                      ? "bg-primary/10 text-primary"
+                      : "text-muted-foreground hover:bg-secondary hover:text-foreground"
+                  )}
+                >
+                  <item.icon className="h-4 w-4" />
+                  {item.label}
+                </Link>
+              );
+            })}
+
+            {/* Test AI Dropdown */}
+            <DropdownMenu>
+              <DropdownMenuTrigger asChild>
+                <button className={cn(
+                  "flex items-center gap-2 rounded-lg px-3.5 py-2 text-sm font-medium transition-all duration-200",
+                  (location.pathname === "/scan-test-ai" || location.pathname === "/tumor-vision-ai")
+                    ? "bg-primary/10 text-primary"
+                    : "text-muted-foreground hover:bg-secondary hover:text-foreground"
+                )}>
+                  <Stethoscope className="h-4 w-4" />
+                  Test AI
+                  <ChevronDown className="h-3.5 w-3.5" />
+                </button>
+              </DropdownMenuTrigger>
+              <DropdownMenuContent align="end" className="w-48">
+                {testAIOptions.map((option) => (
+                  <DropdownMenuItem key={option.href} onClick={() => navigate(option.href)}>
+                    <option.icon className="h-4 w-4 mr-2" />
+                    <span>{option.label}</span>
+                  </DropdownMenuItem>
+                ))}
+              </DropdownMenuContent>
+            </DropdownMenu>
+
+            {navItems.slice(4).map((item) => {
               const isActive = location.pathname === item.href;
               return (
                 <Link
@@ -96,7 +157,53 @@ export function Layout({ children }: { children: React.ReactNode }) {
 
                 {/* Mobile Navigation */}
                 <nav className="flex-1 space-y-1 p-4">
-                  {navItems.map((item) => {
+                  {navItems.slice(0, 4).map((item) => {
+                    const isActive = location.pathname === item.href;
+                    return (
+                      <Link
+                        key={item.href}
+                        to={item.href}
+                        onClick={() => setMobileOpen(false)}
+                        className={cn(
+                          "flex items-center gap-3 rounded-lg px-4 py-3 text-sm font-medium transition-all",
+                          isActive
+                            ? "bg-primary/10 text-primary"
+                            : "text-muted-foreground hover:bg-secondary hover:text-foreground"
+                        )}
+                      >
+                        <item.icon className="h-5 w-5" />
+                        {item.label}
+                      </Link>
+                    );
+                  })}
+
+                  {/* Mobile Test AI Dropdown */}
+                  <div className="space-y-1">
+                    <div className="flex items-center gap-3 rounded-lg px-4 py-3 text-sm font-medium text-muted-foreground">
+                      <Stethoscope className="h-5 w-5" />
+                      Test AI
+                    </div>
+                    <div className="space-y-1 pl-4">
+                      {testAIOptions.map((option) => (
+                        <Link
+                          key={option.href}
+                          to={option.href}
+                          onClick={() => setMobileOpen(false)}
+                          className={cn(
+                            "flex items-center gap-3 rounded-lg px-4 py-2 text-sm font-medium transition-all",
+                            location.pathname === option.href
+                              ? "bg-primary/10 text-primary"
+                              : "text-muted-foreground hover:bg-secondary hover:text-foreground"
+                          )}
+                        >
+                          <option.icon className="h-4 w-4" />
+                          {option.label}
+                        </Link>
+                      ))}
+                    </div>
+                  </div>
+
+                  {navItems.slice(4).map((item) => {
                     const isActive = location.pathname === item.href;
                     return (
                       <Link

@@ -7,7 +7,10 @@ import {
   Stethoscope,
   ShieldCheck,
   Zap,
-  Heart
+  Heart,
+  Dumbbell,
+  Wind,
+  Brain
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
@@ -33,6 +36,27 @@ const quickActions = [
     icon: MapPin,
     href: "/hospitals",
     color: "bg-accent/10 text-accent",
+  },
+  {
+    title: "Fitness Tracker",
+    description: "Track your workouts and achieve your fitness goals with AI guidance",
+    icon: Dumbbell,
+    href: "/fitness",
+    color: "bg-emerald-100 text-emerald-600",
+  },
+  {
+    title: "Vital Lung AI",
+    description: "Clinical-grade chest X-ray analysis powered by advanced deep learning",
+    icon: Wind,
+    href: "/scan-test-ai",
+    color: "bg-cyan-100 text-cyan-600",
+  },
+  {
+    title: "TumorVision AI",
+    description: "Clinical-grade brain MRI diagnostic assistant for tumor detection",
+    icon: Brain,
+    href: "/tumor-vision-ai",
+    color: "bg-purple-100 text-purple-600",
   },
 ];
 
@@ -139,7 +163,7 @@ export default function Home() {
           </p>
         </div>
 
-        <div className="grid gap-6 md:grid-cols-3">
+        <div className="grid gap-6 md:grid-cols-2 lg:grid-cols-3">
           {quickActions.map((action) => (
             <Link key={action.href} to={action.href}>
               <Card variant="interactive" className="h-full">
